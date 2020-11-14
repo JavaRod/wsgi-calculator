@@ -40,45 +40,103 @@ To submit your homework:
 
 
 """
+import traceback
+
+
+def rtfm(*args):
+    content = """
+<h1>Welcome to the Calculator</h1>
+<p>Many numbers enter, only one number returns</p>
+<p>To use this calculator, enter this URL into the browser</p>
+<p>http://127.0.0.1/FUNCTION/VALUE/VALUE/...</p>
+<p>FUNCTION can be <ul><li>add</li><li>subtract</li><li>multiply</li><li>divide</li></ul></p>
+<p>You can have 1 or more integers for VALUE</p>
+<p>Entering only 1 value will simply return that value</p>
+<p>Note: You will receive a message if you attempt to divide by 0</p>
+<h2>Examples</h2>
+<p>Addition: http://127.0.0.1:8080/add/23/42</p>
+<p>Subtraction: http://127.0.0.1:8080/subtract/23/42</p>
+<p>Multiplication: http://127.0.0.1:8080/multiply/3/5</p>
+<p>Division: http://127.0.01:8080/divide/22/11</p>
+"""
+
+    return content
 
 
 def add(*args):
-    """ Returns a STRING with the sum of the arguments """
+    total = sum(map(int, args))
+    return str(total)
 
-    # TODO: Fill sum with the correct value, based on the
-    # args provided.
-    sum = "0"
 
-    return sum
+def subtract(*args):
+    result = int(args[0])
+    for value in args[1:]:
+        result = result - int(value)
+    return str(result)
 
-# TODO: Add functions for handling more arithmetic operations.
+
+def multiply(*args):
+    result = int(args[0])
+    for value in args[1:]:
+        result = result * int(value)
+    return str(result)
+
+
+def divide(*args):
+    try:
+        result = int(args[0])
+        for value in args[1:]:
+            result = result / int(value)
+        return str(result)
+    except ZeroDivisionError:
+        return "Cannot divide by 0"
+
 
 def resolve_path(path):
-    """
-    Should return two values: a callable and an iterable of
-    arguments.
-    """
+    funcs = {
+        '': rtfm,
+        'add': add,
+        'subtract': subtract,
+        'multiply': multiply,
+        'divide': divide
+    }
 
-    # TODO: Provide correct values for func and args. The
-    # examples provide the correct *syntax*, but you should
-    # determine the actual values of func and args using the
-    # path.
-    func = add
-    args = ['25', '32']
+    path = path.strip('/').split('/')
+
+    func_name = path[0]
+    args = path[1:]
+
+    try:
+        func = funcs[func_name]
+    except KeyError:
+        raise NameError
 
     return func, args
 
+
 def application(environ, start_response):
-    # TODO: Your application code from the book database
-    # work here as well! Remember that your application must
-    # invoke start_response(status, headers) and also return
-    # the body of the response in BYTE encoding.
-    #
-    # TODO (bonus): Add error handling for a user attempting
-    # to divide by zero.
-    pass
+    headers = [('Content-type', 'text/html')]
+    try:
+        path = environ.get('PATH_INFO', None)
+        if path is None:
+            raise NameError
+        func, args = resolve_path(path)
+        body = func(*args)
+        status = "200 OK"
+    except NameError:
+        status = "404 Not Found"
+        body = "<h1>Not Found</h1>"
+    except Exception:
+        status = "500 Internal Server Error"
+        body = "<h1>Internal Server Error</h1>"
+        print(traceback.format_exc())
+    finally:
+        headers.append(('Content-length', str(len(body))))
+        start_response(status, headers)
+        return [body.encode('utf8')]
+
 
 if __name__ == '__main__':
-    # TODO: Insert the same boilerplate wsgiref simple
-    # server creation that you used in the book database.
-    pass
+    from wsgiref.simple_server import make_server
+    srv = make_server('localhost', 8080, application)
+    srv.serve_forever()
